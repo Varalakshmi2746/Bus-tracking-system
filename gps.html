@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Bus GPS Sender</title>
+
+<style>
+
+body{
+font-family:Arial;
+text-align:center;
+background:#f4f6f9;
+padding-top:40px;
+}
+
+button{
+padding:12px 20px;
+font-size:16px;
+background:#27ae60;
+color:white;
+border:none;
+border-radius:5px;
+cursor:pointer;
+}
+
+button:hover{
+background:#1e8f4d;
+}
+
+#status{
+margin-top:20px;
+font-size:16px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Bus GPS Sender 🚍</h1>
+
+<button onclick="startGPS()">Start GPS Tracking</button>
+
+<p id="status">Waiting to start GPS...</p>
+
+<script>
+
+let busId = prompt("Enter Bus ID (Example: BUS1)");
+
+function startGPS(){
+
+if(!navigator.geolocation){
+
+alert("Geolocation not supported");
+
+return;
+
+}
+
+navigator.geolocation.watchPosition(
+
+function(position){
+
+let lat = position.coords.latitude;
+let lng = position.coords.longitude;
+let accuracy = position.coords.accuracy;
+
+document.getElementById("status").innerHTML =
+"Latitude: "+lat+
+"<br>Longitude: "+lng+
+"<br>Accuracy: "+accuracy+" meters"+
+"<br>Status: Sending GPS...";
+
+fetch("/update-location",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+busId:busId,
+lat:lat,
+lng:lng
+})
+
+});
+
+},
+
+function(error){
+
+document.getElementById("status").innerHTML =
+"GPS Error: "+error.message;
+
+},
+
+{
+
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:5000
+
+}
+
+);
+
+}
+
+</script>
+
+</body>
+
+</html>

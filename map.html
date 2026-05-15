@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Smart Bus Tracking</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+background:#f4f6f9;
+}
+
+header{
+background:#1f4fd8;
+color:white;
+padding:15px;
+text-align:center;
+font-size:22px;
+font-weight:bold;
+}
+
+.container{
+padding:15px;
+}
+
+.searchBox{
+display:flex;
+gap:10px;
+margin-bottom:10px;
+}
+
+.searchBox input{
+flex:1;
+padding:12px;
+font-size:16px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+.searchBox button{
+background:#27ae60;
+color:white;
+border:none;
+padding:12px 18px;
+border-radius:6px;
+font-size:16px;
+cursor:pointer;
+}
+
+.searchBox button:hover{
+background:#1e8f4d;
+}
+
+#map{
+height:60vh;
+border-radius:10px;
+}
+
+.infoCard{
+background:white;
+margin-top:10px;
+padding:15px;
+border-radius:10px;
+box-shadow:0 4px 12px rgba(0,0,0,0.1);
+font-size:16px;
+}
+
+.label{
+font-weight:bold;
+color:#555;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+Smart Bus Tracking 🚍
+</header>
+
+<div class="container">
+
+<div class="searchBox">
+<input id="busSearch" placeholder="Enter Bus Number">
+<button onclick="searchBus()">Search Bus</button>
+</div>
+
+<div id="map"></div>
+
+<div class="infoCard" id="info">
+Bus: - <br>
+Speed: - <br>
+Distance: -
+</div>
+
+</div>
+
+<script>
+
+var map = L.map('map').setView([16.506,80.648],13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(map);
+
+let markers = {};
+let passengerLocation = null;
+
+// custom bus icon
+let busIcon = L.icon({
+iconUrl:"https://cdn-icons-png.flaticon.com/512/61/61231.png",
+iconSize:[35,35]
+});
+
+// bus stops example
+let stops = [
+[16.506,80.648],
+[16.509,80.651],
+[16.512,80.655]
+];
+
+stops.forEach(stop=>{
+L.marker(stop).addTo(map).bindPopup("Bus Stop");
+});
+
+// route line
+L.polyline(stops,{color:"blue"}).addTo(map);
+
+// passenger location
+navigator.geolocation.getCurrentPosition(function(pos){
+
+passengerLocation = [pos.coords.latitude,pos.coords.longitude];
+
+L.marker(passengerLocation)
+.addTo(map)
+.bindPopup("You are here")
+.openPopup();
+
+});
+
+function distance(lat1,lon1,lat2,lon2){
+
+let R = 6371;
+
+let dLat = (lat2-lat1)*Math.PI/180;
+let dLon = (lon2-lon1)*Math.PI/180;
+
+let a =
+Math.sin(dLat/2)*Math.sin(dLat/2) +
+Math.cos(lat1*Math.PI/180)*
+Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)*Math.sin(dLon/2);
+
+let c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
+
+}
+
+function updateLocations(){
+
+fetch("/locations")
+.then(res=>res.json())
+.then(data=>{
+
+for(let busId in data){
+
+let lat = data[busId].lat;
+let lng = data[busId].lng;
+
+if(!markers[busId]){
+
+markers[busId] = L.marker([lat,lng],{icon:busIcon})
+.addTo(map)
+.bindPopup("Bus "+busId);
+
+}else{
+
+markers[busId].setLatLng([lat,lng]).update();
+
+}
+
+}
+
+});
+
+}
+
+setInterval(updateLocations,1000);
+
+function searchBus(){
+
+let busId = document.getElementById("busSearch").value;
+
+fetch("/locations")
+.then(res=>res.json())
+.then(data=>{
+
+if(data[busId]){
+
+let lat = data[busId].lat;
+let lng = data[busId].lng;
+
+map.setView([lat,lng],16);
+
+markers[busId].openPopup();
+
+let dist = 0;
+
+if(passengerLocation){
+
+dist = distance(
+passengerLocation[0],
+passengerLocation[1],
+lat,
+lng
+).toFixed(2);
+
+}
+
+document.getElementById("info").innerHTML =
+"Bus: "+busId+
+"<br>Speed: "+(data[busId].speed || 0)+" km/h"+
+"<br>Distance: "+dist+" km";
+
+}
+
+});
+
+}
+
+</script>
+
+</body>
+</html>
