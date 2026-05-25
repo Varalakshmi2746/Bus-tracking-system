@@ -8,29 +8,129 @@
 <style>
 
 body{
+margin:0;
 font-family:Arial;
-text-align:center;
 background:#f4f6f9;
-padding-top:40px;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.container{
+
+background:white;
+
+padding:40px;
+
+width:400px;
+
+border-radius:20px;
+
+box-shadow:0 5px 20px rgba(0,0,0,0.2);
+
+text-align:center;
+
+}
+
+h1{
+
+color:#1f4fd8;
+
+margin-bottom:20px;
+
+}
+
+input{
+
+width:90%;
+
+padding:12px;
+
+margin-bottom:12px;
+
+border-radius:10px;
+
+border:1px solid #ccc;
+
+font-size:16px;
+
 }
 
 button{
-padding:12px 20px;
-font-size:16px;
+
 background:#27ae60;
+
 color:white;
+
 border:none;
-border-radius:5px;
+
+padding:15px 25px;
+
+font-size:18px;
+
+border-radius:10px;
+
 cursor:pointer;
+
+margin-top:10px;
+
+transition:0.3s;
+
 }
 
 button:hover{
-background:#1e8f4d;
+
+background:#1d8a4b;
+
+transform:scale(1.03);
+
 }
 
-#status{
+.card{
+
+background:#f4f6f9;
+
+padding:15px;
+
+margin-top:15px;
+
+border-radius:12px;
+
+font-size:18px;
+
+font-weight:bold;
+
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
+
+}
+
+.status{
+
 margin-top:20px;
-font-size:16px;
+
+font-size:18px;
+
+font-weight:bold;
+
+color:#1f4fd8;
+
+}
+
+.live{
+
+color:green;
+
+animation:blink 1s infinite;
+
+}
+
+@keyframes blink{
+
+50%{
+opacity:0.5;
+}
+
 }
 
 </style>
@@ -39,39 +139,78 @@ font-size:16px;
 
 <body>
 
+<div class="container">
+
 <h1>Bus GPS Sender 🚍</h1>
 
-<button onclick="startGPS()">Start GPS Tracking</button>
+<div class="card" id="busCard">
+Bus ID: -
+</div>
 
-<p id="status">Waiting to start GPS...</p>
+<input
+type="number"
+id="seats"
+placeholder="Available Seats">
+
+<button onclick="startGPS()">
+Start GPS Tracking
+</button>
+
+<div class="card" id="locationCard">
+
+Latitude: -
+
+<br><br>
+
+Longitude: -
+
+<br><br>
+
+Accuracy: -
+
+<br><br>
+
+Seats Available: -
+
+</div>
+
+<div class="status">
+🟢 <span class="live">LIVE TRACKING ACTIVE</span>
+</div>
+
+</div>
 
 <script>
 
-let busId = prompt("Enter Bus ID (Example: BUS1)");
+let busId = prompt("Enter Bus ID");
+
+document.getElementById("busCard").innerHTML =
+"Bus ID: " + busId;
 
 function startGPS(){
-
-if(!navigator.geolocation){
-
-alert("Geolocation not supported");
-
-return;
-
-}
 
 navigator.geolocation.watchPosition(
 
 function(position){
 
 let lat = position.coords.latitude;
+
 let lng = position.coords.longitude;
+
 let accuracy = position.coords.accuracy;
 
-document.getElementById("status").innerHTML =
-"Latitude: "+lat+
-"<br>Longitude: "+lng+
-"<br>Accuracy: "+accuracy+" meters"+
-"<br>Status: Sending GPS...";
+let seats =
+document.getElementById("seats").value;
+
+document.getElementById("locationCard").innerHTML =
+
+"Latitude: " + lat +
+
+"<br><br>Longitude: " + lng +
+
+"<br><br>Accuracy: " + accuracy + " meters" +
+
+"<br><br>Seats Available: " + seats;
 
 fetch("/update-location",{
 
@@ -82,9 +221,15 @@ headers:{
 },
 
 body:JSON.stringify({
+
 busId:busId,
+
 lat:lat,
-lng:lng
+
+lng:lng,
+
+seats:seats
+
 })
 
 });
@@ -93,15 +238,16 @@ lng:lng
 
 function(error){
 
-document.getElementById("status").innerHTML =
-"GPS Error: "+error.message;
+alert("GPS Error");
 
 },
 
 {
 
 enableHighAccuracy:true,
+
 maximumAge:0,
+
 timeout:5000
 
 }
@@ -113,5 +259,4 @@ timeout:5000
 </script>
 
 </body>
-
 </html>

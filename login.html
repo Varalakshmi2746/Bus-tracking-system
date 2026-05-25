@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Login</title>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Passenger Login 🚍</h1>
+
+<input type="text" id="username" placeholder="Enter Username">
+
+<input type="password" id="password" placeholder="Enter Password">
+
+<button onclick="login()">Login</button>
+
+<p>
+Don't have account?
+<a href="signup.html">Signup</a>
+</p>
+
+</div>
+
+<script>
+
+function login(){
+
+let username =
+document.getElementById("username").value;
+
+let password =
+document.getElementById("password").value;
+
+if(username && password){
+
+window.location.href="dashboard.html";
+
+}else{
+
+alert("Enter all details");
+
+}
+
+}
+
+</script>
+
+</body>
+</html>

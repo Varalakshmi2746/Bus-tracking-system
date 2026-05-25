@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Dashboard</title>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Welcome 🚍</h1>
+
+<p>
+Smart Public Transport Management System
+</p>
+
+<div class="card">
+🚌 Live Bus Tracking
+</div>
+
+<div class="card">
+📍 Real-time GPS Monitoring
+</div>
+
+<div class="card">
+⚡ Smart Public Transport System
+</div>
+
+<br>
+
+<button onclick="openTracking()">
+Open Bus Tracking
+</button>
+
+<br><br>
+
+<button onclick="openGPS()">
+Driver GPS
+</button>
+
+<br><br>
+
+<button onclick="logout()">
+Logout
+</button>
+
+</div>
+
+<script>
+
+function openTracking(){
+
+window.location.href = "map.html";
+
+}
+
+function openGPS(){
+
+window.location.href = "gps.html";
+
+}
+
+function logout(){
+
+window.location.href = "login.html";
+
+}
+
+</script>
+
+</body>
+</html>
