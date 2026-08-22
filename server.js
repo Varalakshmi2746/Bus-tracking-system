@@ -1,10 +1,40 @@
 const express = require("express");
+const path = require("path");
 
 const app = express();
 
 app.use(express.json());
 
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, ".")));
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "login.html"));
+});
+
+app.get("/login.html", (req, res) => {
+    res.sendFile(path.join(__dirname, "login.html"));
+});
+
+app.get("/signup.html", (req, res) => {
+    res.sendFile(path.join(__dirname, "signup.html"));
+});
+
+app.get("/dashboard.html", (req, res) => {
+    res.sendFile(path.join(__dirname, "dashboard.html"));
+});
+
+app.get("/map.html", (req, res) => {
+    res.sendFile(path.join(__dirname, "map.html"));
+});
+
+app.get("/gps.html", (req, res) => {
+    res.sendFile(path.join(__dirname, "gps.html"));
+});
+
+app.get("/style.css", (req, res) => {
+    res.sendFile(path.join(__dirname, "style.css"));
+});
+
 
 let buses = {};
 
@@ -141,12 +171,17 @@ app.get("/locations", (req, res) => {
 
 // START SERVER
 
-app.listen(3000, () => {
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
 
     console.log(
 
-        "Server running on http://localhost:3000"
+        `Server running on port ${PORT}`
 
     );
 
 });
+
+module.exports = app;
+
