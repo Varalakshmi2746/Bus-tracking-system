@@ -1,14 +1,18 @@
 ﻿{
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "*.html", "use": "@vercel/static" },
-    { "src": "*.css", "use": "@vercel/static" }
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["*.html", "*.css"]
+      }
+    }
   ],
   "routes": [
-    { "src": "/update-location", "dest": "/server.js" },
-    { "src": "/locations", "dest": "/server.js" },
-    { "src": "/", "dest": "/login.html" },
-    { "src": "/(.*)", "dest": "/$1" }
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
   ]
 }
