@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Smart Bus Tracking</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+background:#f4f6f9;
+}
+
+header{
+background:#1f4fd8;
+color:white;
+padding:18px;
+text-align:center;
+font-size:24px;
+font-weight:bold;
+box-shadow:0 3px 10px rgba(0,0,0,0.2);
+}
+
+.container{
+padding:15px;
+}
+
+.searchBox{
+display:flex;
+gap:10px;
+margin-bottom:15px;
+}
+
+.searchBox input{
+
+flex:1;
+
+padding:14px;
+
+font-size:16px;
+
+border-radius:8px;
+
+border:1px solid #ccc;
+
+outline:none;
+
+}
+
+.searchBox button{
+
+background:#27ae60;
+
+color:white;
+
+border:none;
+
+padding:14px 20px;
+
+border-radius:8px;
+
+font-size:16px;
+
+cursor:pointer;
+
+font-weight:bold;
+
+transition:0.3s;
+
+}
+
+.searchBox button:hover{
+
+background:#1d8a4b;
+
+transform:scale(1.03);
+
+}
+
+#map{
+
+height:65vh;
+
+border-radius:15px;
+
+box-shadow:0 4px 15px rgba(0,0,0,0.2);
+
+}
+
+.infoCard{
+
+background:white;
+
+margin-top:15px;
+
+padding:20px;
+
+border-radius:15px;
+
+box-shadow:0 4px 12px rgba(0,0,0,0.1);
+
+font-size:18px;
+
+line-height:1.8;
+
+}
+
+.status{
+
+font-weight:bold;
+
+color:green;
+
+}
+
+.live{
+
+animation:blink 1s infinite;
+
+}
+
+@keyframes blink{
+
+50%{
+opacity:0.5;
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+Smart Bus Tracking 🚍
+</header>
+
+<div class="container">
+
+<div class="searchBox">
+
+<input id="busSearch" placeholder="Enter Bus Number">
+
+<button onclick="searchBus()">
+Search Bus
+</button>
+
+</div>
+
+<div id="map"></div>
+
+<div class="infoCard" id="info">
+
+🚌 Bus: -
+
+<br>
+
+⚡ Speed: -
+
+<br>
+
+📍 Distance: -
+
+<br>
+
+⏱ ETA: -
+
+<br>
+
+💺 Seats Available: -
+
+<br><br>
+
+<span class="status">
+🟢 <span class="live">LIVE TRACKING ACTIVE</span>
+</span>
+
+</div>
+
+</div>
+
+<script>
+
+var map = L.map('map').setView([16.506,80.648],13);
+
+L.tileLayer(
+
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+{
+
+maxZoom:19
+
+}
+
+).addTo(map);
+
+let markers = {};
+
+let passengerLocation = null;
+
+// BUS ICON
+
+let busIcon = L.icon({
+
+iconUrl:"https://cdn-icons-png.flaticon.com/512/3448/3448339.png",
+
+iconSize:[60,60]
+
+});
+
+// PASSENGER ICON
+
+let passengerIcon = L.icon({
+
+iconUrl:"https://cdn-icons-png.flaticon.com/512/149/149071.png",
+
+iconSize:[40,40]
+
+});
+
+// BUS STOPS
+
+let stops = [
+
+[16.506,80.648],
+
+[16.509,80.651],
+
+[16.512,80.655]
+
+];
+
+// BUS STOP MARKERS
+
+stops.forEach(stop=>{
+
+L.marker(stop)
+
+.addTo(map)
+
+.bindPopup("🚌 Bus Stop");
+
+});
+
+// ROUTE LINE
+
+L.polyline(stops,{
+
+color:"#003cff",
+
+weight:5
+
+}).addTo(map);
+
+// PASSENGER LOCATION
+
+navigator.geolocation.getCurrentPosition(function(pos){
+
+passengerLocation = [
+
+pos.coords.latitude,
+
+pos.coords.longitude
+
+];
+
+L.marker(passengerLocation,{
+
+icon:passengerIcon
+
+})
+
+.addTo(map)
+
+.bindPopup("📍 You are here")
+
+.openPopup();
+
+});
+
+// DISTANCE FUNCTION
+
+function distance(lat1,lon1,lat2,lon2){
+
+let R = 6371;
+
+let dLat = (lat2-lat1)*Math.PI/180;
+
+let dLon = (lon2-lon1)*Math.PI/180;
+
+let a =
+
+Math.sin(dLat/2)*Math.sin(dLat/2) +
+
+Math.cos(lat1*Math.PI/180) *
+
+Math.cos(lat2*Math.PI/180) *
+
+Math.sin(dLon/2)*Math.sin(dLon/2);
+
+let c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
+
+}
+
+// UPDATE BUS LOCATIONS
+
+function updateLocations(){
+
+fetch("/locations")
+
+.then(res=>res.json())
+
+.then(data=>{
+
+for(let busId in data){
+
+let lat = data[busId].lat;
+
+let lng = data[busId].lng;
+
+if(!markers[busId]){
+
+markers[busId] =
+
+L.marker([lat,lng],{
+
+icon:busIcon
+
+})
+
+.addTo(map)
+
+.bindPopup("🚌 Bus " + busId);
+
+}else{
+
+markers[busId]
+
+.setLatLng([lat,lng])
+
+.update();
+
+}
+
+}
+
+});
+
+}
+
+setInterval(updateLocations,1000);
+
+// SEARCH BUS
+
+function searchBus(){
+
+let busId =
+
+document.getElementById("busSearch").value;
+
+fetch("/locations")
+
+.then(res=>res.json())
+
+.then(data=>{
+
+if(data[busId]){
+
+let lat = data[busId].lat;
+
+let lng = data[busId].lng;
+
+map.setView([lat,lng],16);
+
+markers[busId].openPopup();
+
+let dist = 0;
+
+if(passengerLocation){
+
+dist = distance(
+
+passengerLocation[0],
+
+passengerLocation[1],
+
+lat,
+
+lng
+
+).toFixed(2);
+
+}
+
+let speed =
+
+parseFloat(data[busId].speed || 1);
+
+let eta = "Calculating...";
+
+if(speed > 1){
+
+eta =
+
+((dist / speed) * 60)
+
+.toFixed(1) + " mins";
+
+}
+
+document.getElementById("info").innerHTML =
+
+"🚌 Bus: " + busId +
+
+"<br>⚡ Speed: " + speed + " km/h" +
+
+"<br>📍 Distance: " + dist + " km" +
+
+"<br>⏱ ETA: " + eta +
+
+"<br>💺 Seats Available: " + data[busId].seats +
+
+"<br><br><span class='status'>🟢 LIVE TRACKING ACTIVE</span>";
+
+}else{
+
+alert("Bus not found");
+
+}
+
+});
+
+}
+
+</script>
+
+</body>
+
+</html>
