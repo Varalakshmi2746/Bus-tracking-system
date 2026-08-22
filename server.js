@@ -1,39 +1,40 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, ".")));
+function serveFile(filename, res) {
+    const possiblePaths = [
+        path.join(__dirname, filename),
+        path.join(__dirname, "public", filename),
+        path.join(process.cwd(), filename),
+        path.join(process.cwd(), "public", filename),
+        path.join(__dirname, "..", filename),
+        path.join(__dirname, "..", "public", filename)
+    ];
 
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "login.html"));
-});
+    for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+            return res.sendFile(p);
+        }
+    }
+    res.status(404).send(`File not found: ${filename}`);
+}
 
-app.get("/login.html", (req, res) => {
-    res.sendFile(path.join(__dirname, "login.html"));
-});
-
-app.get("/signup.html", (req, res) => {
-    res.sendFile(path.join(__dirname, "signup.html"));
-});
-
-app.get("/dashboard.html", (req, res) => {
-    res.sendFile(path.join(__dirname, "dashboard.html"));
-});
-
-app.get("/map.html", (req, res) => {
-    res.sendFile(path.join(__dirname, "map.html"));
-});
-
-app.get("/gps.html", (req, res) => {
-    res.sendFile(path.join(__dirname, "gps.html"));
-});
-
+app.get("/", (req, res) => serveFile("login.html", res));
+app.get("/login.html", (req, res) => serveFile("login.html", res));
+app.get("/signup.html", (req, res) => serveFile("signup.html", res));
+app.get("/dashboard.html", (req, res) => serveFile("dashboard.html", res));
+app.get("/map.html", (req, res) => serveFile("map.html", res));
+app.get("/gps.html", (req, res) => serveFile("gps.html", res));
 app.get("/style.css", (req, res) => {
-    res.sendFile(path.join(__dirname, "style.css"));
+    res.type("text/css");
+    serveFile("style.css", res);
 });
+
 
 
 let buses = {};
