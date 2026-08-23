@@ -1,45 +1,87 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
-<title>Signup</title>
-
-<link rel="stylesheet" href="style.css">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Smart Bus Tracking</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+    <header>
+        <div class="nav-container">
+            <a href="dashboard.html" class="logo">🚍 SmartBus Transit</a>
+            <ul class="nav-links">
+                <li><a href="login.html">Login</a></li>
+                <li><a href="signup.html" class="active">Signup</a></li>
+            </ul>
+        </div>
+    </header>
 
-<div class="container">
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <h1>Create Account 🚌</h1>
+            <p class="subtitle">Join SmartBus for real-time tracking alerts</p>
 
-<h1>Create Account 🚌</h1>
+            <form id="signupForm" onsubmit="handleSignup(event)">
+                <div class="form-group">
+                    <label for="reg_name">Full Name</label>
+                    <input type="text" id="reg_name" class="form-control" placeholder="John Passenger" required>
+                </div>
 
-<input type="text" placeholder="Username">
+                <div class="form-group">
+                    <label for="reg_email">Email Address</label>
+                    <input type="email" id="reg_email" class="form-control" placeholder="name@example.com" required>
+                </div>
 
-<input type="email" placeholder="Email">
+                <div class="form-group">
+                    <label for="reg_password">Password</label>
+                    <input type="password" id="reg_password" class="form-control" placeholder="••••••••" required minlength="4">
+                </div>
 
-<input type="password" placeholder="Password">
+                <div class="form-group">
+                    <label for="reg_role">Register As</label>
+                    <select id="reg_role" class="form-control">
+                        <option value="passenger">Passenger</option>
+                        <option value="driver">Bus Driver / Operator</option>
+                        <option value="admin">Fleet Manager</option>
+                    </select>
+                </div>
 
-<button onclick="signup()">Signup</button>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
 
-<p>
-Already have account?
-<a href="login.html">Login</a>
-</p>
+            <p style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                Already have an account? <a href="login.html" style="color: var(--primary); font-weight: 600; text-decoration: none;">Log In</a>
+            </p>
+        </div>
+    </div>
 
-</div>
+    <footer>
+        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Public Transit.
+    </footer>
 
-<script>
+    <script>
+        function handleSignup(e) {
+            e.preventDefault();
+            const name = document.getElementById('reg_name').value.trim();
+            const email = document.getElementById('reg_email').value.trim();
+            const role = document.getElementById('reg_role').value;
 
-function signup(){
+            // Store user session
+            localStorage.setItem('bus_user', JSON.stringify({
+                username: name,
+                email: email,
+                role: role,
+                loginTime: new Date().toISOString()
+            }));
 
-alert("Account Created Successfully");
-
-window.location.href="login.html";
-
-}
-
-</script>
-
+            alert('Account created successfully!');
+            if (role === 'driver') {
+                window.location.href = 'gps.html';
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+    </script>
 </body>
 </html>

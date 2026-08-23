@@ -1,262 +1,364 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver GPS Transmitter - Smart Bus</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .control-panel {
+            background: white;
+            border-radius: var(--radius);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
 
-<title>Bus GPS Sender</title>
+        .telemetry-card {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            font-family: monospace;
+            box-shadow: var(--shadow-lg);
+            margin-top: 1.5rem;
+        }
 
-<style>
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
 
-body{
-margin:0;
-font-family:Arial;
-background:#f4f6f9;
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-}
+        .telemetry-item {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-.container{
+        .telemetry-item span {
+            display: block;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
 
-background:white;
+        .telemetry-item strong {
+            font-size: 1.2rem;
+            color: #38bdf8;
+            display: block;
+            margin-top: 4px;
+        }
 
-padding:40px;
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            background: var(--bg);
+            padding: 6px;
+            border-radius: 10px;
+        }
 
-width:400px;
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
 
-border-radius:20px;
-
-box-shadow:0 5px 20px rgba(0,0,0,0.2);
-
-text-align:center;
-
-}
-
-h1{
-
-color:#1f4fd8;
-
-margin-bottom:20px;
-
-}
-
-input{
-
-width:90%;
-
-padding:12px;
-
-margin-bottom:12px;
-
-border-radius:10px;
-
-border:1px solid #ccc;
-
-font-size:16px;
-
-}
-
-button{
-
-background:#27ae60;
-
-color:white;
-
-border:none;
-
-padding:15px 25px;
-
-font-size:18px;
-
-border-radius:10px;
-
-cursor:pointer;
-
-margin-top:10px;
-
-transition:0.3s;
-
-}
-
-button:hover{
-
-background:#1d8a4b;
-
-transform:scale(1.03);
-
-}
-
-.card{
-
-background:#f4f6f9;
-
-padding:15px;
-
-margin-top:15px;
-
-border-radius:12px;
-
-font-size:18px;
-
-font-weight:bold;
-
-box-shadow:0 3px 10px rgba(0,0,0,0.1);
-
-}
-
-.status{
-
-margin-top:20px;
-
-font-size:18px;
-
-font-weight:bold;
-
-color:#1f4fd8;
-
-}
-
-.live{
-
-color:green;
-
-animation:blink 1s infinite;
-
-}
-
-@keyframes blink{
-
-50%{
-opacity:0.5;
-}
-
-}
-
-</style>
-
+        .mode-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+    </style>
 </head>
-
 <body>
+    <header>
+        <div class="nav-container">
+            <a href="dashboard.html" class="logo">🚍 SmartBus Transit</a>
+            <ul class="nav-links">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="map.html">Live Map</a></li>
+                <li><a href="gps.html" class="active">Driver GPS</a></li>
+                <li><a href="login.html" class="nav-btn-logout">Logout</a></li>
+            </ul>
+        </div>
+    </header>
 
-<div class="container">
+    <div class="main-wrapper" style="max-width: 800px;">
+        <div style="margin-bottom: 1.5rem; text-align: center;">
+            <h1 style="font-size: 2rem; color: var(--primary); font-weight: 800;">Driver GPS Telemetry Console 📡</h1>
+            <p style="color: var(--text-muted);">Transmit live bus positioning or simulate route telemetry to passengers</p>
+        </div>
 
-<h1>Bus GPS Sender 🚍</h1>
+        <div class="control-panel">
+            <!-- Mode Switcher -->
+            <div class="mode-toggle">
+                <button type="button" class="mode-btn active" id="btnModeSim" onclick="switchMode('sim')">
+                    🚗 Route Simulation Mode (Demo)
+                </button>
+                <button type="button" class="mode-btn" id="btnModeReal" onclick="switchMode('real')">
+                    📍 Real Device GPS (Mobile)
+                </button>
+            </div>
 
-<div class="card" id="busCard">
-Bus ID: -
-</div>
+            <form id="transmitterForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="busId">Bus Identifier</label>
+                        <select id="busId" class="form-control" onchange="onBusSelected()">
+                            <option value="BUS-101">BUS-101 (Downtown Express)</option>
+                            <option value="BUS-102">BUS-102 (Metro City Loop)</option>
+                            <option value="BUS-103">BUS-103 (University Shuttle)</option>
+                            <option value="CUSTOM">➕ New Custom Bus</option>
+                        </select>
+                    </div>
 
-<input
-type="number"
-id="seats"
-placeholder="Available Seats">
+                    <div class="form-group">
+                        <label for="busNumber">Bus Plate / Number</label>
+                        <input type="text" id="busNumber" class="form-control" value="101A" required>
+                    </div>
+                </div>
 
-<button onclick="startGPS()">
-Start GPS Tracking
-</button>
+                <div class="form-group">
+                    <label for="routeName">Assigned Route</label>
+                    <input type="text" id="routeName" class="form-control" value="Downtown Express (Station -> Tech Hub)" required>
+                </div>
 
-<div class="card" id="locationCard">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="driverName">Driver Name</label>
+                        <input type="text" id="driverName" class="form-control" value="Captain Alex">
+                    </div>
 
-Latitude: -
+                    <div class="form-group">
+                        <label for="totalSeats">Total Capacity</label>
+                        <input type="number" id="totalSeats" class="form-control" value="40" min="10" max="100">
+                    </div>
 
-<br><br>
+                    <div class="form-group">
+                        <label for="seatsAvailable">Seats Left</label>
+                        <input type="number" id="seatsAvailable" class="form-control" value="18" min="0" max="100">
+                    </div>
+                </div>
 
-Longitude: -
+                <div style="display: flex; gap: 12px; margin-top: 1rem;">
+                    <button type="button" id="btnStart" onclick="startBroadcasting()" class="btn btn-success" style="flex: 2;">
+                        ▶ Start Broadcasting GPS
+                    </button>
+                    <button type="button" id="btnStop" onclick="stopBroadcasting()" class="btn btn-danger" style="flex: 1;" disabled>
+                        ⏹ Stop
+                    </button>
+                </div>
+            </form>
 
-<br><br>
+            <!-- Live Telemetry Card -->
+            <div class="telemetry-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 8px;">
+                    <span style="font-weight: bold; color: #38bdf8;">📡 SATELLITE TELEMETRY FEED</span>
+                    <span id="transmittingBadge" class="badge badge-idle">OFFLINE</span>
+                </div>
 
-Accuracy: -
+                <div class="telemetry-grid">
+                    <div class="telemetry-item">
+                        <span>Latitude</span>
+                        <strong id="telemLat">--.----</strong>
+                    </div>
+                    <div class="telemetry-item">
+                        <span>Longitude</span>
+                        <strong id="telemLng">--.----</strong>
+                    </div>
+                    <div class="telemetry-item">
+                        <span>Speed</span>
+                        <strong id="telemSpeed">-- km/h</strong>
+                    </div>
+                    <div class="telemetry-item">
+                        <span>Pings Sent</span>
+                        <strong id="telemPings">0</strong>
+                    </div>
+                </div>
 
-<br><br>
+                <div style="margin-top: 1rem; font-size: 0.85rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                    <span id="telemStatus">Ready to transmit. Click Start Broadcasting.</span>
+                    <a href="map.html" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 600;">
+                        Open Map to View ↗
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-Seats Available: -
+    <footer>
+        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Public Transit.
+    </footer>
 
-</div>
+    <script>
+        let currentMode = 'sim'; // 'sim' or 'real'
+        let isBroadcasting = false;
+        let pingsCount = 0;
+        let broadcastInterval = null;
+        let geoWatchId = null;
 
-<div class="status">
-🟢 <span class="live">LIVE TRACKING ACTIVE</span>
-</div>
+        // Predefined city waypoints for smooth demo route simulation
+        const routeWaypoints = [
+            { lat: 16.5062, lng: 80.6480, speed: 35 },
+            { lat: 16.5085, lng: 80.6450, speed: 42 },
+            { lat: 16.5110, lng: 80.6410, speed: 45 },
+            { lat: 16.5145, lng: 80.6360, speed: 38 },
+            { lat: 16.5180, lng: 80.6310, speed: 28 },
+            { lat: 16.5160, lng: 80.6270, speed: 40 },
+            { lat: 16.5120, lng: 80.6230, speed: 48 },
+            { lat: 16.5070, lng: 80.6280, speed: 44 },
+            { lat: 16.5030, lng: 80.6350, speed: 32 },
+            { lat: 16.5010, lng: 80.6420, speed: 36 }
+        ];
+        let waypointIndex = 0;
 
-</div>
+        function switchMode(mode) {
+            if (isBroadcasting) {
+                alert("Please stop broadcasting before switching modes.");
+                return;
+            }
+            currentMode = mode;
+            document.getElementById('btnModeSim').classList.toggle('active', mode === 'sim');
+            document.getElementById('btnModeReal').classList.toggle('active', mode === 'real');
+            document.getElementById('telemStatus').textContent = mode === 'sim' 
+                ? "Simulated Route mode selected. Works on any laptop/PC."
+                : "Real Device GPS mode selected. Transmits browser geolocation.";
+        }
 
-<script>
+        function onBusSelected() {
+            const val = document.getElementById('busId').value;
+            if (val === 'BUS-101') {
+                document.getElementById('busNumber').value = '101A';
+                document.getElementById('routeName').value = 'Downtown Express (Station -> Tech Hub)';
+            } else if (val === 'BUS-102') {
+                document.getElementById('busNumber').value = '204B';
+                document.getElementById('routeName').value = 'Metro City Loop (Airport -> Central Market)';
+            } else if (val === 'BUS-103') {
+                document.getElementById('busNumber').value = '305C';
+                document.getElementById('routeName').value = 'University Shuttle (Campus -> North Terminal)';
+            } else {
+                document.getElementById('busNumber').value = '999X';
+                document.getElementById('routeName').value = 'New Custom Route';
+            }
+        }
 
-let busId = prompt("Enter Bus ID");
+        async function sendLocationUpdate(lat, lng, speed) {
+            const busIdVal = document.getElementById('busId').value;
+            const busId = busIdVal === 'CUSTOM' ? document.getElementById('busNumber').value : busIdVal;
+            const busNumber = document.getElementById('busNumber').value;
+            const route = document.getElementById('routeName').value;
+            const driverName = document.getElementById('driverName').value;
+            const totalSeats = document.getElementById('totalSeats').value;
+            const seatsAvailable = document.getElementById('seatsAvailable').value;
 
-document.getElementById("busCard").innerHTML =
-"Bus ID: " + busId;
+            try {
+                const payload = {
+                    busId,
+                    busNumber,
+                    route,
+                    driverName,
+                    lat,
+                    lng,
+                    speed,
+                    totalSeats,
+                    seatsAvailable
+                };
 
-function startGPS(){
+                const res = await fetch('/api/update-location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-navigator.geolocation.watchPosition(
+                const data = await res.json();
+                if (data.success) {
+                    pingsCount++;
+                    document.getElementById('telemPings').textContent = pingsCount;
+                    document.getElementById('telemLat').textContent = Number(lat).toFixed(4);
+                    document.getElementById('telemLng').textContent = Number(lng).toFixed(4);
+                    document.getElementById('telemSpeed').textContent = `${Math.round(speed)} km/h`;
+                    document.getElementById('telemStatus').textContent = `Transmitted ping #${pingsCount} at ${new Date().toLocaleTimeString()}`;
+                }
+            } catch (err) {
+                console.error("Transmission error:", err);
+                document.getElementById('telemStatus').textContent = `Transmission failed: ${err.message}`;
+            }
+        }
 
-function(position){
+        function startBroadcasting() {
+            isBroadcasting = true;
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            
+            const badge = document.getElementById('transmittingBadge');
+            badge.className = "badge badge-live";
+            badge.textContent = "BROADCASTING";
 
-let lat = position.coords.latitude;
+            if (currentMode === 'sim') {
+                // Route Simulation: Step through waypoints every 2.5 seconds
+                transmitSimulatedStep();
+                broadcastInterval = setInterval(transmitSimulatedStep, 2500);
+            } else {
+                // Real GPS Mode
+                if (!navigator.geolocation) {
+                    alert("Geolocation is not supported by your browser. Falling back to Simulation Mode.");
+                    switchMode('sim');
+                    startBroadcasting();
+                    return;
+                }
 
-let lng = position.coords.longitude;
+                geoWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const speed = position.coords.speed ? (position.coords.speed * 3.6) : 35; // Convert m/s to km/h
+                        sendLocationUpdate(lat, lng, speed);
+                    },
+                    (err) => {
+                        console.error("GPS Watch Error:", err);
+                        document.getElementById('telemStatus').textContent = `GPS error: ${err.message}`;
+                    },
+                    { enableHighAccuracy: true, maximumAge: 1000 }
+                );
+            }
+        }
 
-let accuracy = position.coords.accuracy;
+        function transmitSimulatedStep() {
+            const pt = routeWaypoints[waypointIndex];
+            // Add slight jitter for realism
+            const jitterLat = pt.lat + (Math.random() - 0.5) * 0.0004;
+            const jitterLng = pt.lng + (Math.random() - 0.5) * 0.0004;
+            const speed = pt.speed + Math.floor(Math.random() * 6 - 3);
 
-let seats =
-document.getElementById("seats").value;
+            sendLocationUpdate(jitterLat, jitterLng, speed);
 
-document.getElementById("locationCard").innerHTML =
+            waypointIndex = (waypointIndex + 1) % routeWaypoints.length;
+        }
 
-"Latitude: " + lat +
+        function stopBroadcasting() {
+            isBroadcasting = false;
+            if (broadcastInterval) clearInterval(broadcastInterval);
+            if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
 
-"<br><br>Longitude: " + lng +
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
 
-"<br><br>Accuracy: " + accuracy + " meters" +
-
-"<br><br>Seats Available: " + seats;
-
-fetch("/update-location",{
-
-method:"POST",
-
-headers:{
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-
-busId:busId,
-
-lat:lat,
-
-lng:lng,
-
-seats:seats
-
-})
-
-});
-
-},
-
-function(error){
-
-alert("GPS Error");
-
-},
-
-{
-
-enableHighAccuracy:true,
-
-maximumAge:0,
-
-timeout:5000
-
-}
-
-);
-
-}
-
-</script>
-
+            const badge = document.getElementById('transmittingBadge');
+            badge.className = "badge badge-idle";
+            badge.textContent = "PAUSED";
+            document.getElementById('telemStatus').textContent = "Broadcasting paused.";
+        }
+    </script>
 </body>
 </html>

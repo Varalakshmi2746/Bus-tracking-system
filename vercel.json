@@ -1,7 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/update-location", "destination": "/api/index" },
-    { "source": "/locations", "destination": "/api/index" },
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/locations", "destination": "/api/index" }
   ]
 }
