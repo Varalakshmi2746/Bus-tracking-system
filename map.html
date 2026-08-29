@@ -12,29 +12,53 @@
             background: #1f4fd8;
             color: white;
             border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 18px;
-            box-shadow: 0 4px 10px rgba(31, 79, 216, 0.4);
+            box-shadow: 0 4px 12px rgba(31, 79, 216, 0.45);
             border: 2.5px solid white;
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .bus-heading-indicator {
+            position: absolute;
+            top: -6px;
+            font-size: 10px;
+            color: #ffea00;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
         }
 
         .user-marker-icon {
             background: #10b981;
             color: white;
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 16px;
             box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.25);
             border: 2px solid white;
+        }
+
+        .stop-marker-icon {
+            background: #ffffff;
+            color: #1f4fd8;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            border: 2px solid #1f4fd8;
+            font-weight: bold;
         }
 
         .bus-list-item {
@@ -50,6 +74,26 @@
         .bus-list-item:hover, .bus-list-item.selected {
             border-color: var(--primary);
             background: var(--primary-light);
+        }
+
+        .follow-btn {
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .follow-btn.active {
+            background: #eff6ff;
+            border-color: var(--primary);
+            color: var(--primary);
         }
     </style>
 </head>
@@ -68,13 +112,16 @@
 
     <div class="main-wrapper" style="margin-top: 1rem; margin-bottom: 1rem;">
         <!-- Search & Control Bar -->
-        <div style="display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
             <div style="flex: 1; min-width: 260px; display: flex; gap: 8px;">
                 <input type="text" id="busSearchInput" placeholder="🔍 Search Bus (e.g. 101, BUS-102, Metro...)" class="form-control" onkeyup="filterBuses()">
                 <button onclick="searchBus()" class="btn btn-primary" style="width: auto; white-space: nowrap;">Search</button>
             </div>
             <button onclick="getUserLocation()" class="btn btn-outline" style="width: auto; display: flex; align-items: center; gap: 6px;">
                 📍 Locate Me
+            </button>
+            <button onclick="toggleFollowBus()" id="btnFollow" class="follow-btn">
+                🎯 Follow Selected Bus
             </button>
             <button onclick="fitAllMarkers()" class="btn btn-outline" style="width: auto;">
                 🗺️ View All Buses
@@ -91,7 +138,7 @@
                 <div class="info-card" id="busDetailsCard">
                     <h2>
                         <span>Selected Bus</span>
-                        <span id="liveStatusBadge" class="badge badge-live">LIVE</span>
+                        <span id="liveStatusBadge" class="badge badge-live">LIVE MOVING</span>
                     </h2>
 
                     <div style="margin-bottom: 12px;">
@@ -105,13 +152,18 @@
                     </div>
 
                     <div class="detail-row">
+                        <span class="detail-label">🧭 Heading</span>
+                        <span class="detail-val" id="detailBearing">--°</span>
+                    </div>
+
+                    <div class="detail-row">
                         <span class="detail-label">📍 Distance from You</span>
                         <span class="detail-val" id="detailDistance">Calculating...</span>
                     </div>
 
                     <div class="detail-row">
                         <span class="detail-label">⏱ Estimated ETA</span>
-                        <span class="detail-val" id="detailEta" style="color: var(--secondary);">Calculating...</span>
+                        <span class="detail-val" id="detailEta" style="color: var(--secondary); font-weight: bold;">Calculating...</span>
                     </div>
 
                     <div class="detail-row">
@@ -125,8 +177,8 @@
                     </div>
 
                     <div class="detail-row">
-                        <span class="detail-label">🕒 Last Telemetry</span>
-                        <span class="detail-val" id="detailTimestamp">Just now</span>
+                        <span class="detail-label">🕒 Telemetry Sync</span>
+                        <span class="detail-val" id="detailTimestamp">Live Streaming</span>
                     </div>
                 </div>
 
@@ -144,11 +196,11 @@
     </div>
 
     <footer>
-        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Public Transit.
+        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Continuous Live Transit.
     </footer>
 
     <script>
-        // Initialize Leaflet Map centered at default coordinates (Vijayawada transit network)
+        // Initialize Leaflet Map
         const defaultCenter = [16.5062, 80.6480];
         const map = L.map('map').setView(defaultCenter, 13);
 
@@ -158,19 +210,34 @@
         }).addTo(map);
 
         let busMarkers = {};
+        let busAnimationFrames = {};
         let allBusesData = [];
         let selectedBusId = null;
         let userLocation = null;
         let userMarker = null;
+        let routePolylines = {};
+        let isFollowing = false;
+
+        // Colors for routes
+        const ROUTE_COLORS = {
+            "BUS-101": "#1f4fd8",
+            "BUS-102": "#10b981",
+            "BUS-103": "#f59e0b"
+        };
 
         // Custom Leaflet DivIcons
-        function createBusIcon() {
+        function createBusIcon(bearing = 0) {
             return L.divIcon({
                 className: 'custom-bus-icon',
-                html: `<div class="bus-marker-icon">🚍</div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18],
-                popupAnchor: [0, -18]
+                html: `
+                    <div class="bus-marker-icon">
+                        <span class="bus-heading-indicator">▲</span>
+                        🚍
+                    </div>
+                `,
+                iconSize: [38, 38],
+                iconAnchor: [19, 19],
+                popupAnchor: [0, -19]
             });
         }
 
@@ -178,10 +245,90 @@
             return L.divIcon({
                 className: 'custom-user-icon',
                 html: `<div class="user-marker-icon">👤</div>`,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16],
-                popupAnchor: [0, -16]
+                iconSize: [34, 34],
+                iconAnchor: [17, 17],
+                popupAnchor: [0, -17]
             });
+        }
+
+        function createStopIcon(label) {
+            return L.divIcon({
+                className: 'custom-stop-icon',
+                html: `<div class="stop-marker-icon" title="Bus Stop">${label}</div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            });
+        }
+
+        // Smoothly animates a marker between current lat/lng and target lat/lng
+        function smoothMoveMarker(marker, targetLat, targetLng, bearing, durationMs = 1400) {
+            const busId = marker._busId;
+            if (busAnimationFrames[busId]) {
+                cancelAnimationFrame(busAnimationFrames[busId]);
+            }
+
+            const startPos = marker.getLatLng();
+            const startLat = startPos.lat;
+            const startLng = startPos.lng;
+            const startTime = performance.now();
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / durationMs, 1);
+                // Linear / smooth progression
+                const curLat = startLat + (targetLat - startLat) * progress;
+                const curLng = startLng + (targetLng - startLng) * progress;
+
+                marker.setLatLng([curLat, curLng]);
+
+                // Update heading indicator rotation if marker DOM exists
+                const iconEl = marker.getElement();
+                if (iconEl && bearing !== undefined) {
+                    const indicator = iconEl.querySelector('.bus-heading-indicator');
+                    if (indicator) {
+                        indicator.style.transform = `rotate(${bearing}deg)`;
+                    }
+                }
+
+                // If following this bus, keep map centered
+                if (isFollowing && selectedBusId === busId) {
+                    map.panTo([curLat, curLng], { animate: false });
+                }
+
+                if (progress < 1) {
+                    busAnimationFrames[busId] = requestAnimationFrame(animate);
+                }
+            }
+
+            busAnimationFrames[busId] = requestAnimationFrame(animate);
+        }
+
+        // Draw transit route lines & stops
+        function renderRoutes(routes) {
+            if (!routes) return;
+            for (const [id, waypoints] of Object.entries(routes)) {
+                if (!routePolylines[id]) {
+                    const color = ROUTE_COLORS[id] || "#1f4fd8";
+                    const poly = L.polyline(waypoints, {
+                        color: color,
+                        weight: 4,
+                        opacity: 0.75,
+                        dashArray: '8, 8',
+                        lineJoin: 'round'
+                    }).addTo(map);
+
+                    // Add bus stop markers along key waypoints
+                    waypoints.forEach((pt, i) => {
+                        if (i % 3 === 0 && i < waypoints.length - 1) {
+                            L.marker(pt, { icon: createStopIcon(i + 1) })
+                                .addTo(map)
+                                .bindPopup(`<b>🚏 Bus Stop #${i + 1}</b><br>Served by ${id}`);
+                        }
+                    });
+
+                    routePolylines[id] = poly;
+                }
+            }
         }
 
         // Haversine Distance Formula in Kilometers
@@ -211,16 +358,28 @@
                         } else {
                             userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: createUserIcon() })
                                 .addTo(map)
-                                .bindPopup("<b>Your Location</b>").openPopup();
+                                .bindPopup("<b>📍 Your Location</b>").openPopup();
                         }
 
                         map.setView([userLocation.lat, userLocation.lng], 14);
                         updateSelectedBusCard();
                     },
                     (error) => {
-                        console.warn("Geolocation permission not granted or unavailable:", error.message);
+                        console.warn("Geolocation permission:", error.message);
                     }
                 );
+            }
+        }
+
+        // Toggle Follow Mode
+        function toggleFollowBus() {
+            isFollowing = !isFollowing;
+            const btn = document.getElementById('btnFollow');
+            btn.classList.toggle('active', isFollowing);
+            btn.textContent = isFollowing ? "🎯 Following Bus (Active)" : "🎯 Follow Selected Bus";
+
+            if (isFollowing && selectedBusId && busMarkers[selectedBusId]) {
+                map.panTo(busMarkers[selectedBusId].getLatLng(), { animate: true });
             }
         }
 
@@ -234,10 +393,14 @@
                     allBusesData = data.buses;
                     document.getElementById('activeCount').textContent = allBusesData.length;
                     
+                    if (data.routes) {
+                        renderRoutes(data.routes);
+                    }
+
                     updateMarkers(allBusesData);
                     renderBusList(allBusesData);
 
-                    // Check URL parameter for initial bus selection
+                    // Check URL parameter or select first bus
                     if (!selectedBusId) {
                         const urlParams = new URLSearchParams(window.location.search);
                         const busParam = urlParams.get('bus');
@@ -251,30 +414,47 @@
                     }
                 }
             } catch (err) {
-                console.error("Error updating bus markers:", err);
+                console.error("Error updating live bus telemetry:", err);
             }
         }
 
-        // Update Leaflet Map Markers
+        // Update Leaflet Map Markers with smooth gliding movement
         function updateMarkers(buses) {
             buses.forEach(bus => {
-                const pos = [bus.lat, bus.lng];
+                const targetLat = bus.lat;
+                const targetLng = bus.lng;
+                const bearing = bus.bearing || 0;
 
                 if (busMarkers[bus.busId]) {
-                    busMarkers[bus.busId].setLatLng(pos);
+                    // Smoothly animate marker to the new coordinates
+                    smoothMoveMarker(busMarkers[bus.busId], targetLat, targetLng, bearing, 1400);
+
+                    // Update popup content
+                    busMarkers[bus.busId].setPopupContent(`
+                        <div style="font-family: sans-serif; min-width: 160px;">
+                            <strong style="color:#1f4fd8; font-size:1.1rem;">${bus.busId}</strong> (${bus.busNumber || ''})<br>
+                            <small style="color:#555;">${bus.route}</small><br>
+                            <hr style="margin:6px 0; border:0; border-top:1px solid #eee;">
+                            ⚡ Speed: <b>${bus.speed || 0} km/h</b><br>
+                            🧭 Bearing: <b>${bearing}°</b><br>
+                            💺 Seats Left: <b>${bus.seatsAvailable}</b>
+                        </div>
+                    `);
                 } else {
-                    const marker = L.marker(pos, { icon: createBusIcon() })
+                    const marker = L.marker([targetLat, targetLng], { icon: createBusIcon(bearing) })
                         .addTo(map)
                         .bindPopup(`
-                            <div style="font-family: sans-serif; min-width: 150px;">
+                            <div style="font-family: sans-serif; min-width: 160px;">
                                 <strong style="color:#1f4fd8; font-size:1.1rem;">${bus.busId}</strong> (${bus.busNumber || ''})<br>
-                                <small>${bus.route}</small><br>
+                                <small style="color:#555;">${bus.route}</small><br>
                                 <hr style="margin:6px 0; border:0; border-top:1px solid #eee;">
                                 ⚡ Speed: <b>${bus.speed || 0} km/h</b><br>
+                                🧭 Bearing: <b>${bearing}°</b><br>
                                 💺 Seats Left: <b>${bus.seatsAvailable}</b>
                             </div>
                         `);
 
+                    marker._busId = bus.busId;
                     marker.on('click', () => {
                         selectBus(bus.busId);
                     });
@@ -296,7 +476,7 @@
                 <div class="bus-list-item ${bus.busId === selectedBusId ? 'selected' : ''}" onclick="selectBus('${bus.busId}')">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <strong style="color: var(--primary);">${bus.busId}</strong>
-                        <span class="badge ${bus.status === 'Active' ? 'badge-live' : 'badge-idle'}">${bus.speed || 0} km/h</span>
+                        <span class="badge badge-live">${bus.speed || 0} km/h</span>
                     </div>
                     <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">${bus.route}</div>
                     <div style="font-size: 0.78rem; color: ${Number(bus.seatsAvailable) < 5 ? 'var(--danger)' : 'var(--secondary)'}; margin-top: 2px;">
@@ -306,7 +486,7 @@
             `).join('');
         }
 
-        // Select Bus and Highlight on Map
+        // Select Bus and Focus on Map
         function selectBus(busId) {
             selectedBusId = busId;
             const bus = allBusesData.find(b => b.busId === busId);
@@ -328,13 +508,10 @@
             document.getElementById('detailBusId').textContent = `${bus.busId} (${bus.busNumber || ''})`;
             document.getElementById('detailRoute').textContent = bus.route || 'Standard Route';
             document.getElementById('detailSpeed').textContent = `${bus.speed || 0} km/h`;
+            document.getElementById('detailBearing').textContent = `${bus.bearing !== undefined ? bus.bearing : '--'}°`;
             document.getElementById('detailSeats').textContent = `${bus.seatsAvailable} / ${bus.totalSeats || 40}`;
             document.getElementById('detailDriver').textContent = bus.driverName || 'Assigned Driver';
-            
-            if (bus.updatedAt) {
-                const date = new Date(bus.updatedAt);
-                document.getElementById('detailTimestamp').textContent = date.toLocaleTimeString();
-            }
+            document.getElementById('detailTimestamp').textContent = new Date().toLocaleTimeString();
 
             // Distance & ETA calculation if passenger location exists
             if (userLocation) {
@@ -394,7 +571,8 @@
         // Initial setup
         getUserLocation();
         fetchBusLocations();
-        setInterval(fetchBusLocations, 2500);
+        // Fast 1.5 second telemetry poll for continuous real-time movement
+        setInterval(fetchBusLocations, 1500);
     </script>
 </body>
 </html>

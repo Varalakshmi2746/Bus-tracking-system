@@ -6,64 +6,117 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initial seed buses for instant live display
+// Multi-waypoint city transit routes
+const ROUTES = {
+    "BUS-101": [
+        [16.5062, 80.6480],
+        [16.5085, 80.6450],
+        [16.5110, 80.6410],
+        [16.5145, 80.6360],
+        [16.5180, 80.6310],
+        [16.5160, 80.6270],
+        [16.5120, 80.6230],
+        [16.5070, 80.6280],
+        [16.5030, 80.6350],
+        [16.5010, 80.6420],
+        [16.5040, 80.6460],
+        [16.5062, 80.6480]
+    ],
+    "BUS-102": [
+        [16.5150, 80.6320],
+        [16.5190, 80.6380],
+        [16.5230, 80.6450],
+        [16.5210, 80.6540],
+        [16.5160, 80.6600],
+        [16.5090, 80.6580],
+        [16.5040, 80.6510],
+        [16.5080, 80.6420],
+        [16.5120, 80.6350],
+        [16.5150, 80.6320]
+    ],
+    "BUS-103": [
+        [16.4950, 80.6620],
+        [16.4980, 80.6550],
+        [16.5020, 80.6490],
+        [16.5070, 80.6430],
+        [16.5050, 80.6380],
+        [16.4990, 80.6420],
+        [16.4930, 80.6510],
+        [16.4910, 80.6590],
+        [16.4950, 80.6620]
+    ]
+};
+
+// Calculates continuous real-time coordinates along a waypoint path
+function getSimulatedPosition(route, loopDurationSeconds = 70, offsetSeconds = 0) {
+    const totalWaypoints = route.length;
+    const now = (Date.now() / 1000) + offsetSeconds;
+    const progress = (now % loopDurationSeconds) / loopDurationSeconds;
+    const virtualIndex = progress * (totalWaypoints - 1);
+    const index = Math.floor(virtualIndex);
+    const fraction = virtualIndex - index;
+    const nextIndex = (index + 1) % totalWaypoints;
+
+    const p1 = route[index];
+    const p2 = route[nextIndex];
+
+    const lat = p1[0] + (p2[0] - p1[0]) * fraction;
+    const lng = p1[1] + (p2[1] - p1[1]) * fraction;
+
+    const dLng = (p2[1] - p1[1]) * Math.cos(lat * Math.PI / 180);
+    const dLat = (p2[0] - p1[0]);
+    const bearing = Math.round((Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360);
+
+    const baseSpeed = 36 + Math.sin(now / 4) * 9;
+    const speed = Math.max(18, Math.round(baseSpeed));
+
+    return { lat, lng, bearing, speed };
+}
+
+// Initial state
 let buses = {
     "BUS-101": {
         busId: "BUS-101",
         busNumber: "101A",
         route: "Downtown Express (Station -> Tech Hub)",
         driverName: "John Doe",
-        lat: 16.5062,
-        lng: 80.6480,
-        speed: 38,
-        seatsAvailable: 14,
         totalSeats: 40,
+        seatsAvailable: 14,
         status: "Active",
-        updatedAt: new Date().toISOString()
+        loopDuration: 75,
+        timeOffset: 0,
+        isManual: false,
+        lastManualUpdate: 0
     },
     "BUS-102": {
         busId: "BUS-102",
         busNumber: "204B",
         route: "Metro City Loop (Airport -> Central Market)",
         driverName: "Sarah Connor",
-        lat: 16.5150,
-        lng: 80.6320,
-        speed: 45,
-        seatsAvailable: 6,
         totalSeats: 45,
+        seatsAvailable: 8,
         status: "Active",
-        updatedAt: new Date().toISOString()
+        loopDuration: 90,
+        timeOffset: 25,
+        isManual: false,
+        lastManualUpdate: 0
     },
     "BUS-103": {
         busId: "BUS-103",
         busNumber: "305C",
         route: "University Shuttle (Campus -> North Terminal)",
         driverName: "David Miller",
-        lat: 16.4950,
-        lng: 80.6620,
-        speed: 28,
-        seatsAvailable: 22,
         totalSeats: 35,
+        seatsAvailable: 21,
         status: "Active",
-        updatedAt: new Date().toISOString()
+        loopDuration: 60,
+        timeOffset: 45,
+        isManual: false,
+        lastManualUpdate: 0
     }
 };
 
-// HAVERSINE DISTANCE FUNCTION
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Earth radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-// UPDATE LOCATION HANDLER
+// UPDATE LOCATION HANDLER (From Driver GPS)
 const handleUpdateLocation = (req, res) => {
     let { busId, busNumber, route, driverName, lat, lng, speed, totalSeats, seatsAvailable, seats } = req.body;
     
@@ -73,66 +126,72 @@ const handleUpdateLocation = (req, res) => {
 
     lat = parseFloat(lat);
     lng = parseFloat(lng);
-    const calculatedSpeed = speed !== undefined ? parseFloat(speed) : 0;
+    const calculatedSpeed = speed !== undefined ? parseFloat(speed) : 35;
     const availableSeats = seatsAvailable !== undefined ? parseInt(seatsAvailable) : (seats !== undefined ? parseInt(seats) : 15);
     const maxSeats = totalSeats !== undefined ? parseInt(totalSeats) : 40;
     const nowIso = new Date().toISOString();
 
-    if (buses[busId]) {
-        let old = buses[busId];
-        let currentSpeed = calculatedSpeed;
+    const existing = buses[busId] || {};
+    buses[busId] = {
+        ...existing,
+        busId: busId,
+        busNumber: busNumber || existing.busNumber || busId,
+        route: route || existing.route || "City Loop",
+        driverName: driverName || existing.driverName || "Driver",
+        lat: lat,
+        lng: lng,
+        speed: Math.round(calculatedSpeed),
+        seatsAvailable: availableSeats,
+        totalSeats: maxSeats,
+        status: "Active",
+        isManual: true,
+        lastManualUpdate: Date.now(),
+        updatedAt: nowIso
+    };
 
-        if (isNaN(currentSpeed) || currentSpeed === 0) {
-            let dist = getDistance(old.lat, old.lng, lat, lng);
-            let timeDiff = (Date.now() - new Date(old.updatedAt).getTime()) / 1000;
-            if (dist > 2 && timeDiff > 2) {
-                currentSpeed = Math.min((dist / timeDiff) * 3.6, 120);
-            } else {
-                currentSpeed = old.speed || 0;
-            }
-        }
-
-        buses[busId] = {
-            ...old,
-            busId: busId,
-            busNumber: busNumber || old.busNumber || busId,
-            route: route || old.route || "City Loop",
-            driverName: driverName || old.driverName || "Driver",
-            lat: lat,
-            lng: lng,
-            speed: Math.round(currentSpeed),
-            seatsAvailable: availableSeats,
-            totalSeats: maxSeats,
-            status: "Active",
-            updatedAt: nowIso
-        };
-    } else {
-        buses[busId] = {
-            busId: busId,
-            busNumber: busNumber || busId,
-            route: route || "City Loop",
-            driverName: driverName || "Driver",
-            lat: lat,
-            lng: lng,
-            speed: Math.round(calculatedSpeed) || 35,
-            seatsAvailable: availableSeats,
-            totalSeats: maxSeats,
-            status: "Active",
-            updatedAt: nowIso
-        };
-    }
-
-    console.log(`[Telemetry] Updated ${busId} (${buses[busId].busNumber}): Lat ${lat}, Lng ${lng}, Speed ${buses[busId].speed} km/h`);
+    console.log(`[Live GPS] Updated ${busId}: Lat ${lat}, Lng ${lng}, Speed ${buses[busId].speed} km/h`);
     return res.status(200).json({ success: true, message: "Location updated successfully", busId: busId });
 };
 
-// GET LOCATIONS HANDLER
+// GET LOCATIONS HANDLER (Returns real-time continuous bus positions)
 const handleGetLocations = (req, res) => {
-    const busList = Object.values(buses);
+    const now = Date.now();
+    const resultList = [];
+
+    for (const [id, bus] of Object.entries(buses)) {
+        // If received live driver GPS within 30 seconds, use manual coordinates
+        if (bus.isManual && (now - bus.lastManualUpdate < 30000)) {
+            resultList.push({
+                ...bus,
+                updatedAt: new Date(bus.lastManualUpdate).toISOString()
+            });
+        } else {
+            // Otherwise, calculate real-time continuous movement along route
+            const routePath = ROUTES[id] || ROUTES["BUS-101"];
+            const sim = getSimulatedPosition(routePath, bus.loopDuration || 70, bus.timeOffset || 0);
+
+            // Dynamic seats variance
+            const seatFluctuation = Math.abs(Math.sin(now / 15000 + (bus.timeOffset || 0)));
+            const seatsLeft = Math.max(2, Math.round(bus.totalSeats * (0.2 + 0.6 * seatFluctuation)));
+
+            resultList.push({
+                ...bus,
+                lat: sim.lat,
+                lng: sim.lng,
+                bearing: sim.bearing,
+                speed: sim.speed,
+                seatsAvailable: seatsLeft,
+                status: "Active",
+                updatedAt: new Date().toISOString()
+            });
+        }
+    }
+
     return res.status(200).json({
         success: true,
-        count: busList.length,
-        buses: busList,
+        count: resultList.length,
+        buses: resultList,
+        routes: ROUTES,
         timestamp: new Date().toISOString()
     });
 };
@@ -148,7 +207,7 @@ app.get("/locations", handleGetLocations);
 app.get("/api", (req, res) => {
     res.status(200).json({
         success: true,
-        message: "SmartBus Transit API is operational",
+        message: "SmartBus Transit Real-Time Telemetry API is active",
         activeBuses: Object.keys(buses).length
     });
 });
