@@ -97,7 +97,7 @@
     <div class="main-wrapper" style="max-width: 800px;">
         <div style="margin-bottom: 1.5rem; text-align: center;">
             <h1 style="font-size: 2rem; color: var(--primary); font-weight: 800;">Driver GPS Telemetry Console 📡</h1>
-            <p style="color: var(--text-muted);">Transmit live bus positioning or simulate route telemetry to passengers</p>
+            <p style="color: var(--text-muted);">Transmit real-time GPS coordinates when driving, or test route movement</p>
         </div>
 
         <div class="control-panel">
@@ -165,7 +165,7 @@
             <div class="telemetry-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 8px;">
                     <span style="font-weight: bold; color: #38bdf8;">📡 SATELLITE TELEMETRY FEED</span>
-                    <span id="transmittingBadge" class="badge badge-idle">OFFLINE</span>
+                    <span id="transmittingBadge" class="badge badge-idle">OFFLINE (STATIONARY)</span>
                 </div>
 
                 <div class="telemetry-grid">
@@ -179,7 +179,7 @@
                     </div>
                     <div class="telemetry-item">
                         <span>Speed</span>
-                        <strong id="telemSpeed">-- km/h</strong>
+                        <strong id="telemSpeed">0 km/h</strong>
                     </div>
                     <div class="telemetry-item">
                         <span>Pings Sent</span>
@@ -198,7 +198,7 @@
     </div>
 
     <footer>
-        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Public Transit.
+        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Transit Operations.
     </footer>
 
     <script>
@@ -207,8 +207,10 @@
         let pingsCount = 0;
         let broadcastInterval = null;
         let geoWatchId = null;
+        let lastKnownLat = 16.5062;
+        let lastKnownLng = 80.6480;
 
-        // Predefined city waypoints for smooth demo route simulation
+        // Predefined city waypoints for demo route testing
         const routeWaypoints = [
             { lat: 16.5062, lng: 80.6480, speed: 35 },
             { lat: 16.5085, lng: 80.6450, speed: 42 },
@@ -232,8 +234,8 @@
             document.getElementById('btnModeSim').classList.toggle('active', mode === 'sim');
             document.getElementById('btnModeReal').classList.toggle('active', mode === 'real');
             document.getElementById('telemStatus').textContent = mode === 'sim' 
-                ? "Simulated Route mode selected. Works on any laptop/PC."
-                : "Real Device GPS mode selected. Transmits browser geolocation.";
+                ? "Simulated Route mode selected. Click Start to simulate driving."
+                : "Real Device GPS mode selected. Transmits browser mobile geolocation.";
         }
 
         function onBusSelected() {
@@ -253,7 +255,7 @@
             }
         }
 
-        async function sendLocationUpdate(lat, lng, speed) {
+        async function sendLocationUpdate(lat, lng, speed, isStopped = false) {
             const busIdVal = document.getElementById('busId').value;
             const busId = busIdVal === 'CUSTOM' ? document.getElementById('busNumber').value : busIdVal;
             const busNumber = document.getElementById('busNumber').value;
@@ -261,6 +263,9 @@
             const driverName = document.getElementById('driverName').value;
             const totalSeats = document.getElementById('totalSeats').value;
             const seatsAvailable = document.getElementById('seatsAvailable').value;
+
+            lastKnownLat = lat;
+            lastKnownLng = lng;
 
             try {
                 const payload = {
@@ -270,9 +275,10 @@
                     driverName,
                     lat,
                     lng,
-                    speed,
+                    speed: isStopped ? 0 : speed,
                     totalSeats,
-                    seatsAvailable
+                    seatsAvailable,
+                    isStopped
                 };
 
                 const res = await fetch('/api/update-location', {
@@ -287,8 +293,10 @@
                     document.getElementById('telemPings').textContent = pingsCount;
                     document.getElementById('telemLat').textContent = Number(lat).toFixed(4);
                     document.getElementById('telemLng').textContent = Number(lng).toFixed(4);
-                    document.getElementById('telemSpeed').textContent = `${Math.round(speed)} km/h`;
-                    document.getElementById('telemStatus').textContent = `Transmitted ping #${pingsCount} at ${new Date().toLocaleTimeString()}`;
+                    document.getElementById('telemSpeed').textContent = `${Math.round(isStopped ? 0 : speed)} km/h`;
+                    document.getElementById('telemStatus').textContent = isStopped
+                        ? `Stopped at ${new Date().toLocaleTimeString()} (Stationary)`
+                        : `Transmitted ping #${pingsCount} at ${new Date().toLocaleTimeString()} (${Math.round(speed)} km/h)`;
                 }
             } catch (err) {
                 console.error("Transmission error:", err);
@@ -306,11 +314,9 @@
             badge.textContent = "BROADCASTING";
 
             if (currentMode === 'sim') {
-                // Route Simulation: Step through waypoints every 2.5 seconds
                 transmitSimulatedStep();
-                broadcastInterval = setInterval(transmitSimulatedStep, 2500);
+                broadcastInterval = setInterval(transmitSimulatedStep, 2000);
             } else {
-                // Real GPS Mode
                 if (!navigator.geolocation) {
                     alert("Geolocation is not supported by your browser. Falling back to Simulation Mode.");
                     switchMode('sim');
@@ -322,7 +328,7 @@
                     (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
-                        const speed = position.coords.speed ? (position.coords.speed * 3.6) : 35; // Convert m/s to km/h
+                        const speed = position.coords.speed ? (position.coords.speed * 3.6) : 35;
                         sendLocationUpdate(lat, lng, speed);
                     },
                     (err) => {
@@ -336,9 +342,8 @@
 
         function transmitSimulatedStep() {
             const pt = routeWaypoints[waypointIndex];
-            // Add slight jitter for realism
-            const jitterLat = pt.lat + (Math.random() - 0.5) * 0.0004;
-            const jitterLng = pt.lng + (Math.random() - 0.5) * 0.0004;
+            const jitterLat = pt.lat + (Math.random() - 0.5) * 0.0003;
+            const jitterLng = pt.lng + (Math.random() - 0.5) * 0.0003;
             const speed = pt.speed + Math.floor(Math.random() * 6 - 3);
 
             sendLocationUpdate(jitterLat, jitterLng, speed);
@@ -351,13 +356,16 @@
             if (broadcastInterval) clearInterval(broadcastInterval);
             if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
 
+            // Send stationary status to server immediately
+            sendLocationUpdate(lastKnownLat, lastKnownLng, 0, true);
+
             document.getElementById('btnStart').disabled = false;
             document.getElementById('btnStop').disabled = true;
 
             const badge = document.getElementById('transmittingBadge');
             badge.className = "badge badge-idle";
-            badge.textContent = "PAUSED";
-            document.getElementById('telemStatus').textContent = "Broadcasting paused.";
+            badge.textContent = "OFFLINE (STATIONARY)";
+            document.getElementById('telemStatus').textContent = "Broadcasting stopped. Bus is stationary.";
         }
     </script>
 </body>

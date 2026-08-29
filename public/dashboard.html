@@ -36,7 +36,7 @@
             <div class="stat-card">
                 <div class="stat-icon">🚌</div>
                 <div class="stat-info">
-                    <h3 id="statTotalBuses">--</h3>
+                    <h3 id="statTotalBuses">3</h3>
                     <p>Total Fleet</p>
                 </div>
             </div>
@@ -44,23 +44,23 @@
             <div class="stat-card">
                 <div class="stat-icon" style="background: #dcfce7; color: #16a34a;">🟢</div>
                 <div class="stat-info">
-                    <h3 id="statActiveBuses">--</h3>
-                    <p>Active on Route</p>
+                    <h3 id="statActiveBuses">0</h3>
+                    <p>Active Moving</p>
                 </div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-icon" style="background: #e0e7ff; color: #4338ca;">⚡</div>
                 <div class="stat-info">
-                    <h3 id="statAvgSpeed">-- km/h</h3>
-                    <p>Average Speed</p>
+                    <h3 id="statAvgSpeed">0 km/h</h3>
+                    <p>Fleet Speed</p>
                 </div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-icon" style="background: #fef3c7; color: #d97706;">💺</div>
                 <div class="stat-info">
-                    <h3 id="statAvailableSeats">--</h3>
+                    <h3 id="statAvailableSeats">43</h3>
                     <p>Available Seats</p>
                 </div>
             </div>
@@ -71,7 +71,7 @@
             <div class="action-card">
                 <div>
                     <h3>🗺️ Passenger Live Map</h3>
-                    <p>Track all city buses moving in real-time on Leaflet OpenStreetMap. Check exact distance, live speeds, and estimated arrival times (ETA).</p>
+                    <p>Track buses on Leaflet OpenStreetMap. Check exact distance, live speeds, and estimated arrival times (ETA).</p>
                 </div>
                 <a href="map.html" class="btn btn-primary">Open Live Tracking Map</a>
             </div>
@@ -79,7 +79,7 @@
             <div class="action-card">
                 <div>
                     <h3>📡 Driver GPS Transmitter</h3>
-                    <p>Transmit real-time GPS coordinates directly from your device, or test automated route simulations with dynamic seat count adjustments.</p>
+                    <p>Transmit real-time GPS coordinates directly from your device, or test route movement with dynamic seat count adjustments.</p>
                 </div>
                 <a href="gps.html" class="btn btn-success">Open Driver GPS Console</a>
             </div>
@@ -87,7 +87,7 @@
             <div class="action-card">
                 <div>
                     <h3>⚙️ Fleet Management</h3>
-                    <p>Monitor bus route schedules, inspect active driver assignments, and test server telemetry status in real time.</p>
+                    <p>Monitor bus route schedules, inspect driver assignments, and check server telemetry status in real time.</p>
                 </div>
                 <button onclick="fetchStats()" class="btn btn-outline">Refresh Fleet Data</button>
             </div>
@@ -98,7 +98,7 @@
             <div class="table-header">
                 <h3 style="font-size: 1.15rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
                     🚍 Active Fleet Overview 
-                    <span class="badge badge-live">LIVE UPDATING</span>
+                    <span class="badge badge-live">LIVE TELEMETRY</span>
                 </h3>
                 <span id="lastUpdatedText" style="font-size: 0.85rem; color: var(--text-muted);">Syncing...</span>
             </div>
@@ -119,7 +119,7 @@
                     <tbody id="busesTableBody">
                         <tr>
                             <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                                Loading active buses...
+                                Loading buses telemetry...
                             </td>
                         </tr>
                     </tbody>
@@ -129,7 +129,7 @@
     </div>
 
     <footer>
-        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Public Transit.
+        &copy; 2026 Smart Bus Tracking System. Real-time GPS Telemetry & Transit Operations.
     </footer>
 
     <script>
@@ -156,14 +156,15 @@
                 if (data.success && Array.isArray(data.buses)) {
                     const buses = data.buses;
                     const total = buses.length;
-                    const active = buses.filter(b => b.status === 'Active' || b.speed >= 0).length;
-                    const avgSpeed = total > 0 
-                        ? Math.round(buses.reduce((acc, b) => acc + (Number(b.speed) || 0), 0) / total) 
+                    const activeMoving = buses.filter(b => b.speed && b.speed > 0).length;
+                    const movingBuses = buses.filter(b => b.speed && b.speed > 0);
+                    const avgSpeed = movingBuses.length > 0 
+                        ? Math.round(movingBuses.reduce((acc, b) => acc + (Number(b.speed) || 0), 0) / movingBuses.length) 
                         : 0;
                     const totalSeats = buses.reduce((acc, b) => acc + (Number(b.seatsAvailable) || 0), 0);
 
                     document.getElementById('statTotalBuses').textContent = total;
-                    document.getElementById('statActiveBuses').textContent = active;
+                    document.getElementById('statActiveBuses').textContent = activeMoving;
                     document.getElementById('statAvgSpeed').textContent = `${avgSpeed} km/h`;
                     document.getElementById('statAvailableSeats').textContent = totalSeats;
                     document.getElementById('lastUpdatedText').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
@@ -178,36 +179,39 @@
         function renderTable(buses) {
             const tbody = document.getElementById('busesTableBody');
             if (!buses.length) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">No buses currently active. Launch driver transmitter to start broadcasting!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">No buses configured in system.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = buses.map(bus => `
-                <tr>
-                    <td>
-                        <strong style="color: var(--primary);">${bus.busId}</strong>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">No: ${bus.busNumber || bus.busId}</div>
-                    </td>
-                    <td>${bus.route || 'City Loop'}</td>
-                    <td>${bus.driverName || 'Assigned Driver'}</td>
-                    <td><strong>${bus.speed || 0} km/h</strong></td>
-                    <td>
-                        <span style="font-weight: 700; color: ${Number(bus.seatsAvailable) < 5 ? 'var(--danger)' : 'var(--secondary)'};">
-                            ${bus.seatsAvailable}
-                        </span> / ${bus.totalSeats || 40}
-                    </td>
-                    <td>
-                        <span class="badge ${bus.status === 'Active' ? 'badge-live' : 'badge-idle'}">
-                            ${bus.status || 'Active'}
-                        </span>
-                    </td>
-                    <td>
-                        <a href="map.html?bus=${encodeURIComponent(bus.busId)}" class="btn btn-outline" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
-                            📍 Track
-                        </a>
-                    </td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = buses.map(bus => {
+                const isMoving = bus.speed && bus.speed > 0;
+                return `
+                    <tr>
+                        <td>
+                            <strong style="color: var(--primary);">${bus.busId}</strong>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">No: ${bus.busNumber || bus.busId}</div>
+                        </td>
+                        <td>${bus.route || 'City Loop'}</td>
+                        <td>${bus.driverName || 'Assigned Driver'}</td>
+                        <td><strong>${bus.speed || 0} km/h</strong></td>
+                        <td>
+                            <span style="font-weight: 700; color: ${Number(bus.seatsAvailable) < 5 ? 'var(--danger)' : 'var(--secondary)'};">
+                                ${bus.seatsAvailable}
+                            </span> / ${bus.totalSeats || 40}
+                        </td>
+                        <td>
+                            <span class="badge ${isMoving ? 'badge-live' : 'badge-idle'}">
+                                ${isMoving ? 'Moving' : 'Stationary'}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="map.html?bus=${encodeURIComponent(bus.busId)}" class="btn btn-outline" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+                                📍 Track
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // Initial fetch and auto-polling every 3 seconds
